@@ -1,0 +1,10 @@
+stagedSceneGenerator 0.6 (2018-12-15)
+-------------------------------------
+
+* Set the standard shot speed for the thief flag since it behaves like laser
+
+
+stagedSceneGenerator 0.5 (2018-12-15)
+-------------------------------------
+
+* Initial release

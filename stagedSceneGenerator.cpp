@@ -1,4 +1,4 @@
-// stagedSceneGenerator 0.5 (2018-12-15)
+// stagedSceneGenerator 0.6 (2018-12-15)
 // This BZFlag plugin allows setting up staged scenes with fixed tanks and
 // shots for generating screenshots. See README.stagedSceneGenerator.txt
 
@@ -121,6 +121,7 @@ void stagedSceneGenerator::Init ( const char* commandLine )
         bz_updateBZDBDouble("_shotSpeed", 0.01);
         bz_updateBZDBDouble("_shotRange", 0.05);
         bz_updateBZDBDouble("_laserAdLife", 1.0);
+        bz_updateBZDBDouble("_thiefAdLife", 1.0);
     }
 }
 
@@ -338,16 +339,16 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
             lastShotsFired = data->eventTime;
             for (auto stagedShot : stagedShots)
             {
-                // The laser's length is based on shot speed, so reset the shot speed for this shot
-                if (stagedShot.flag == "L")
+                // The laser and thief length is based on shot speed, so reset the shot speed for this shot
+                if (stagedShot.flag == "L" || stagedShot.flag == "TH")
                     bz_resetBZDBVar("_shotSpeed");
 
                 // FIRE!!!
                 bz_fireServerShot(stagedShot.flag.c_str(), stagedShot.pos, stagedShot.dir, stagedShot.team);
                 bz_debugMessagef(1, "Firing shot at %f %f %f", stagedShot.pos[0], stagedShot.pos[1], stagedShot.pos[2]);
 
-                // If we just shot a laser, remember to set the shot speed again
-                if (stagedShot.flag == "L")
+                // If we just shot a laser or theif, remember to set the shot speed again
+                if (stagedShot.flag == "L" || stagedShot.flag == "TH")
                     bz_updateBZDBDouble("_shotSpeed", 0.01);
             }
         }
