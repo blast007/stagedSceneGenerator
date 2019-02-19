@@ -11,8 +11,9 @@ AM_CXXFLAGS = $(CONF_CXXFLAGS)
 
 EXTRA_DIST = \
 	README.stagedSceneGenerator.txt \
+	stagedSceneGenerator.cfg \
 	stagedSceneGenerator.sln \
-	stagedSceneGenerator.vcxproj	\
+	stagedSceneGenerator.vcxproj \
 	stagedSceneGenerator.vcxproj.filters
 
 MAINTAINERCLEANFILES =	\
