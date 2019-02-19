@@ -61,6 +61,7 @@ private:
         bool random{false};
         float pos[3] {0.0f, 0.0f, 0.0f};
         float rot{0.0f};
+        std::string flag{""};
 
         int playerID{-1};
     };
@@ -106,6 +107,7 @@ void stagedSceneGenerator::Init ( const char* commandLine )
         // init events here with Register();
         Register(bz_eGetAutoTeamEvent);
         Register(bz_eGetPlayerSpawnPosEvent);
+        Register(bz_ePlayerSpawnEvent);
         Register(bz_ePlayerUpdateEvent);
         Register(bz_ePlayerPartEvent);
         Register(bz_eTickEvent);
@@ -146,6 +148,7 @@ bool stagedSceneGenerator::readConfig(const char* configFile)
             StagedPlayer p;
 
             p.team = teamFromString(config.item(section, "team"));
+            p.flag = config.item(section, "flag");
 
             // A tank can be randomly spawned or set to spawn at a fixed location
             p.random = (makelower(config.item(section, "random").c_str()) == "true");
@@ -298,6 +301,25 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
                 break;
             }
         }
+        break;
+    }
+
+    case bz_ePlayerSpawnEvent:
+    {
+        bz_PlayerSpawnEventData_V1* data = (bz_PlayerSpawnEventData_V1*)eventData;
+
+        for (auto &stagedPlayer : stagedPlayers)
+        {
+            if (stagedPlayer.playerID == data->playerID && !stagedPlayer.flag.empty())
+            {
+                bz_debugMessagef(0, "INFO: Giving staged player %d the %s flag", data->playerID, stagedPlayer.flag.c_str());
+
+                bz_givePlayerFlag(data->playerID, stagedPlayer.flag.c_str(), false);
+
+                break;
+            }
+        }
+
         break;
     }
 
