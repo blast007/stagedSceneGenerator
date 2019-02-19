@@ -78,6 +78,11 @@ The rotation is represented in degree.
     pos = 10 20 30
     rot = 180
 
+For tanks, there is the option to give a flag so it'll appear to be carrying a
+flag. This option will not have any affect on shots as those are defined
+separately.
+    flag = US
+
 For tanks, there is the option of using random spawns instead of specifying
 the position and rotation. By default this is turned off, but to enable it:
     random = true
