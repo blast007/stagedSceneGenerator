@@ -78,13 +78,27 @@ private:
 
     std::vector<StagedShot> stagedShots;
 
-    double lastShotsFired = -9999.0f;
+    double lastShotsFired = -9999.0;
+    double delayBetweenShots = 0.0;
+
+    double shotSpeed = 0.01;
+
+    double laserShotSpeed;
+    double thiefShotSpeed;
 };
 
 BZ_PLUGIN(stagedSceneGenerator)
 
 void stagedSceneGenerator::Init ( const char* commandLine )
 {
+    // Cheap hack to detect if the plugin is being loaded from /loadplugin in-game
+    if (bz_getCurrentTime() > 10.0)
+    {
+        bz_debugMessage(0, "ERROR: stagedSceneGeneration can only be loaded from the command line");
+        bz_shutdown();
+        return;
+    }
+
     bz_debugMessage(4,"stagedSceneGenerator plugin loaded");
 
     // A configuration file is required
@@ -118,12 +132,24 @@ void stagedSceneGenerator::Init ( const char* commandLine )
         // Disable those pesky height checks so we can go wild
         bz_updateBZDBBool("_disableHeightChecks", true);
 
+        // Calculate the laser/thief shot speed (which uses the normal values of _shotSpeed and _laserAdLife before
+        // we mess with them below). Because we set the
+        laserShotSpeed = bz_getBZDBDouble("_shotSpeed") * bz_getBZDBDouble("_laserAdLife");
+        thiefShotSpeed = bz_getBZDBDouble("_shotSpeed") * bz_getBZDBDouble("_thiefAdLife");
+
         // Set some values that affect tanks and shots
         bz_updateBZDBDouble("_gravity", -0.000001);
-        bz_updateBZDBDouble("_shotSpeed", 0.01);
+        bz_updateBZDBDouble("_shotSpeed", shotSpeed);
         bz_updateBZDBDouble("_shotRange", 0.05);
         bz_updateBZDBDouble("_laserAdLife", 1.0);
         bz_updateBZDBDouble("_thiefAdLife", 1.0);
+
+        // Hard-code this to the normal 3.5 seconds or else beam weapons aren't the correct length.
+        bz_updateBZDBDouble("_reloadTime", 3.5);
+
+        // Gotta go fast! (only useful when there are no players and only shots)
+        if (stagedPlayers.size() == 0)
+            MaxWaitTime = 0.05f;
     }
 }
 
@@ -139,6 +165,30 @@ bool stagedSceneGenerator::readConfig(const char* configFile)
     // Loop through each section of the configuration. There will be one section per tank or shot.
     for (auto section : config.getSections())
     {
+        // The main section will contain global settings that affect the plugin.
+        if (section == "main")
+        {
+            for (auto item : config.getSectionItems(section))
+            {
+                std::string name = makelower(item.first.c_str());
+                if (name == "shotdelay") {
+                    delayBetweenShots = atof(item.second.c_str());
+                    if (delayBetweenShots < 0.0 || delayBetweenShots > 60.0) {
+                        bz_debugMessage(0,"ERROR: ShotDelay must be between 0.0 and 60.0 (inclusive)");
+                        return false;
+                    }
+                }
+                else if (name == "shotspeed") {
+                    shotSpeed = atof(item.second.c_str());
+                    if (shotSpeed < 0.01 && shotSpeed > 1000.0) {
+                        bz_debugMessage(0,"ERROR: ShotSpeed must be between 0.01 and 1000.0 (inclusive)");
+                        return false;
+                    }
+                }
+            }
+            continue;
+        }
+
         // Store a lowercase copy of the type for comparisons
         std::string type = makelower(config.item(section, "type").c_str());
 
@@ -356,22 +406,24 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
         bz_TickEventData_V1* data = (bz_TickEventData_V1*)eventData;
 
         // I'ma firing my BLAAAAARRRR
-        if (data->eventTime > lastShotsFired + bz_getBZDBDouble("_reloadTime"))
+        if (data->eventTime > lastShotsFired + bz_getBZDBDouble("_reloadTime") + delayBetweenShots)
         {
             lastShotsFired = data->eventTime;
             for (auto stagedShot : stagedShots)
             {
-                // The laser and thief length is based on shot speed, so reset the shot speed for this shot
-                if (stagedShot.flag == "L" || stagedShot.flag == "TH")
-                    bz_resetBZDBVar("_shotSpeed");
+                // The laser and thief length is based on shot speed, so change the shot speed for this shot
+                if (stagedShot.flag == "L")
+                    bz_updateBZDBDouble("_shotSpeed", laserShotSpeed);
+                else if (stagedShot.flag == "TH")
+                    bz_updateBZDBDouble("_shotSpeed", thiefShotSpeed);
 
                 // FIRE!!!
                 bz_fireServerShot(stagedShot.flag.c_str(), stagedShot.pos, stagedShot.dir, stagedShot.team);
                 bz_debugMessagef(1, "Firing shot at %f %f %f", stagedShot.pos[0], stagedShot.pos[1], stagedShot.pos[2]);
 
-                // If we just shot a laser or theif, remember to set the shot speed again
+                // If we just shot a laser or thief, remember to set the shot speed again
                 if (stagedShot.flag == "L" || stagedShot.flag == "TH")
-                    bz_updateBZDBDouble("_shotSpeed", 0.01);
+                    bz_updateBZDBDouble("_shotSpeed", shotSpeed);
             }
         }
     }

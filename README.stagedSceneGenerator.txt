@@ -56,9 +56,18 @@ Configuration File
 --------------------------------------------------------------------------------
 
 The configuration file uses an INI-like format. Most options are optional,
-though you'll generally want at least a team, position, and rotation. Note the
-language below with MUST and MAY, with MUST meaning required and MAY being
-optional.
+though you'll generally want at least a team, position, and rotation for both
+tanks and shots. Note the language below with MUST and MAY, with MUST meaning
+required and MAY being optional.
+
+You MAY have a Main section that MAY contain one or more options that affect
+the overall operation of the plugin or server. ShotSpeed allows changing the
+shot speed. By default this is 0.01 so that shots barely move. ShotDelay is
+the number of seconds between shots being re-fired. This defaults to 0.
+
+    [Main]
+    ShotSpeed = 100
+    ShotDelay = 2
 
 Each staged tank or shot MUST start with a unique section name contained in
 square brackets:
