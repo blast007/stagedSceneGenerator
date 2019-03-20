@@ -64,6 +64,9 @@ private:
         std::string flag{""};
 
         int playerID{-1};
+
+        // Used for GM shots
+        std::string sectionName{""};
     };
 
     std::vector<StagedPlayer> stagedPlayers;
@@ -74,6 +77,10 @@ private:
         float pos[3] {0.0f, 0.0f, 0.0f};
         float dir[3] {1.0f, 0.0f, 0.0f};
         std::string flag{""};
+
+        // Used for GM shots
+        std::string targetPlayerSectionName{""};
+        int targetPlayerID{-1};
     };
 
     std::vector<StagedShot> stagedShots;
@@ -197,8 +204,9 @@ bool stagedSceneGenerator::readConfig(const char* configFile)
         {
             StagedPlayer p;
 
+            p.sectionName = makelower(section.c_str());
             p.team = teamFromString(config.item(section, "team"));
-            p.flag = config.item(section, "flag");
+            p.flag = makeupper(config.item(section, "flag").c_str());
 
             // A tank can be randomly spawned or set to spawn at a fixed location
             p.random = (makelower(config.item(section, "random").c_str()) == "true");
@@ -234,7 +242,12 @@ bool stagedSceneGenerator::readConfig(const char* configFile)
             s.team = teamFromString(config.item(section, "team"));
 
             // A flag abbreviation can be provided to change the shot type
-            s.flag = config.item(section, "flag");
+            s.flag = makeupper(config.item(section, "flag").c_str());
+
+            // If it's a GM, we can also have a target
+            if (s.flag == "GM") {
+                s.targetPlayerSectionName = makelower(config.item(section, "target").c_str());
+            }
 
             std::string pos = config.item(section, "pos");
             if (pos.size() > 0)
@@ -305,6 +318,12 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
                     stagedPlayer.playerID = data->playerID;
                     data->team = stagedPlayer.team;
                     data->handled = true;
+
+                    for (auto &stagedShot : stagedShots) {
+                        if (stagedShot.targetPlayerSectionName == stagedPlayer.sectionName)
+                            stagedShot.targetPlayerID = stagedPlayer.playerID;
+                    }
+
                     break;
                 }
             }
@@ -394,8 +413,14 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
         // When a player leaves, see if they were assigned to a staged player and release them
         for (auto &stagedPlayer : stagedPlayers)
         {
-            if (stagedPlayer.playerID == data->playerID)
+            if (stagedPlayer.playerID == data->playerID) {
                 stagedPlayer.playerID = -1;
+
+                for (auto &stagedShot : stagedShots) {
+                    if (stagedShot.targetPlayerSectionName == stagedPlayer.sectionName)
+                        stagedShot.targetPlayerID = -1;
+                }
+            }
         }
 
         break;
@@ -418,7 +443,7 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
                     bz_updateBZDBDouble("_shotSpeed", thiefShotSpeed);
 
                 // FIRE!!!
-                bz_fireServerShot(stagedShot.flag.c_str(), stagedShot.pos, stagedShot.dir, stagedShot.team);
+                bz_fireServerShot(stagedShot.flag.c_str(), stagedShot.pos, stagedShot.dir, stagedShot.team, stagedShot.targetPlayerID);
                 bz_debugMessagef(1, "Firing shot at %f %f %f", stagedShot.pos[0], stagedShot.pos[1], stagedShot.pos[2]);
 
                 // If we just shot a laser or thief, remember to set the shot speed again
