@@ -151,6 +151,9 @@ void stagedSceneGenerator::Init ( const char* commandLine )
         bz_updateBZDBDouble("_laserAdLife", 1.0);
         bz_updateBZDBDouble("_thiefAdLife", 1.0);
 
+        // Because flags dropping in are affected by gravity, set the altitude to 0 so they land immediately
+        bz_updateBZDBDouble("_flagAltitude", 0.0);
+
         // Hard-code this to the normal 3.5 seconds or else beam weapons aren't the correct length.
         bz_updateBZDBDouble("_reloadTime", 3.5);
 
