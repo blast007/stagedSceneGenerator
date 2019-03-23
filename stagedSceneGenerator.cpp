@@ -427,9 +427,9 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
                     data->rot = stagedPlayer.rot * M_PI / 180.0f;
                 }
 
-                // If using mode static1, spawn the tank slightly in the air so that it won't be moving around
-                if (mode == ModeStatic1)
-                    data->pos[2] += 0.01;
+                // Spawn the tank slightly in the air. For mode static1, this ensures that it won't be moving around.
+                // For other modes, it helps ensure that tanks aren't getting stuck in objects.
+                data->pos[2] += 0.01;
 
                 data->handled = true;
 
