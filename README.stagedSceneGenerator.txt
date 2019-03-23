@@ -61,13 +61,29 @@ tanks and shots. Note the language below with MUST and MAY, with MUST meaning
 required and MAY being optional.
 
 You MAY have a Main section that MAY contain one or more options that affect
-the overall operation of the plugin or server. ShotSpeed allows changing the
-shot speed. By default this is 0.01 so that shots barely move. ShotDelay is
-the number of seconds between shots being re-fired. This defaults to 0.
+the overall operation of the plugin or server.
+
+The Mode option can have one of three values: static1, static2, or normal. The
+static1 mode sets the gravity very low and spawns tanks slightly in the air so
+they won't move, but keeps normal tank speed. This allows observer roaming to
+still move freely, but things like tanks exploding won't look normal because of
+the low gravity. Mode static2 keeps the gravity normal, but sets the tank speed
+and tank angular velocity very low. This also affects the movement of observer
+roaming, so then it is necessary to use the /roampos command to move around.
+Finally, mode normal doesn't alter any setting and instead tanks will be able to
+drive around like normal. The default mode is static1.
+
+The ShotSpeed option allows changing the shot speed. For everything except
+normal mode, this defaults to 0.01 so that shots barely move. ShotDelay is the
+number of seconds between staged shots being re-fired. This defaults to 0.
+SpawnDelay is the number of seconds between the tank explosion ending and the
+tank respawning, which defaults to 0.
 
     [Main]
+    Mode = static2
     ShotSpeed = 100
     ShotDelay = 2
+    SpawnDelay = 5
 
 Each staged tank or shot MUST start with a unique section name contained in
 square brackets:

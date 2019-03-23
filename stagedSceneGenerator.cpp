@@ -67,6 +67,8 @@ private:
 
         // Used for GM shots
         std::string sectionName{""};
+
+        double lastDeath{0.0};
     };
 
     std::vector<StagedPlayer> stagedPlayers;
@@ -87,11 +89,20 @@ private:
 
     double lastShotsFired = -9999.0;
     double delayBetweenShots = 0.0;
+    double spawnDelay = 0.0;
 
     double shotSpeed = 0.01;
 
     double laserShotSpeed;
     double thiefShotSpeed;
+
+    enum Modes {
+        ModeStatic1,
+        ModeStatic2,
+        ModeNormal
+    };
+
+    Modes mode = ModeStatic1;
 };
 
 BZ_PLUGIN(stagedSceneGenerator)
@@ -129,6 +140,7 @@ void stagedSceneGenerator::Init ( const char* commandLine )
         Register(bz_eGetAutoTeamEvent);
         Register(bz_eGetPlayerSpawnPosEvent);
         Register(bz_ePlayerSpawnEvent);
+        Register(bz_ePlayerDieEvent);
         Register(bz_ePlayerUpdateEvent);
         Register(bz_ePlayerPartEvent);
         Register(bz_eTickEvent);
@@ -144,18 +156,35 @@ void stagedSceneGenerator::Init ( const char* commandLine )
         laserShotSpeed = bz_getBZDBDouble("_shotSpeed") * bz_getBZDBDouble("_laserAdLife");
         thiefShotSpeed = bz_getBZDBDouble("_shotSpeed") * bz_getBZDBDouble("_thiefAdLife");
 
-        // Set some values that affect tanks and shots
-        bz_updateBZDBDouble("_gravity", -0.000001);
-        bz_updateBZDBDouble("_shotSpeed", shotSpeed);
-        bz_updateBZDBDouble("_shotRange", 0.05);
-        bz_updateBZDBDouble("_laserAdLife", 1.0);
-        bz_updateBZDBDouble("_thiefAdLife", 1.0);
+        // Mode Static1 - Very low gravity and tanks spawn slightly in the air.
+        // Tank speed is still normal, so it's possible to move as observer
+        if (mode == ModeStatic1)
+        {
+            bz_updateBZDBDouble("_gravity", -0.000001);
 
-        // Because flags dropping in are affected by gravity, set the altitude to 0 so they land immediately
-        bz_updateBZDBDouble("_flagAltitude", 0.0);
+            // Because flags dropping in are affected by gravity, set the altitude to 0 so they land immediately
+            bz_updateBZDBDouble("_flagAltitude", 0.0);
+        }
 
-        // Hard-code this to the normal 3.5 seconds or else beam weapons aren't the correct length.
-        bz_updateBZDBDouble("_reloadTime", 3.5);
+        // Mode Static2 - Very low tank speed and turning velocity. Normal gravity. Can't drive as observer and must
+        // use /roampos to move around. But, tanks explode in the normal arc.
+        else if (mode == ModeStatic2)
+        {
+            bz_updateBZDBDouble("_tankSpeed", -0.000001);
+            bz_updateBZDBDouble("_tankAngVel", -0.000001);
+        }
+
+        // If this isn't normal mode, set some other stuff.
+        if (mode != ModeNormal) {
+            // Set some values that affect tanks and shots
+            bz_updateBZDBDouble("_shotSpeed", shotSpeed);
+            bz_updateBZDBDouble("_shotRange", 0.05);
+            bz_updateBZDBDouble("_laserAdLife", 1.0);
+            bz_updateBZDBDouble("_thiefAdLife", 1.0);
+
+            // Hard-code this to the normal 3.5 seconds or else beam weapons aren't the correct length.
+            bz_updateBZDBDouble("_reloadTime", 3.5);
+        }
 
         // Gotta go fast! (only useful when there are no players and only shots)
         if (stagedPlayers.size() == 0)
@@ -192,6 +221,27 @@ bool stagedSceneGenerator::readConfig(const char* configFile)
                     shotSpeed = atof(item.second.c_str());
                     if (shotSpeed < 0.01 && shotSpeed > 1000.0) {
                         bz_debugMessage(0,"ERROR: ShotSpeed must be between 0.01 and 1000.0 (inclusive)");
+                        return false;
+                    }
+                }
+                else if (name == "spawndelay") {
+                    spawnDelay = atof(item.second.c_str());
+                    if (spawnDelay < 0.0 || spawnDelay > 60.0) {
+                        bz_debugMessage(0,"ERROR: SpawnDelay must be between 0.0 and 60.0 (inclusive)");
+                        return false;
+                    }
+                }
+                else if (name == "mode")
+                {
+                    std::string _mode = makelower(item.second.c_str());
+                    if (_mode == "static1")
+                        mode = ModeStatic1;
+                    else if (_mode == "static2")
+                        mode = ModeStatic2;
+                    else if (_mode == "normal")
+                        mode = ModeNormal;
+                    else {
+                        bz_debugMessage(0,"ERROR: Mode must be one of: static1, static2, or normal");
                         return false;
                     }
                 }
@@ -364,8 +414,9 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
                     data->rot = stagedPlayer.rot * M_PI / 180.0f;
                 }
 
-                // Spawn the tank slightly in the air so that it won't be moving around
-                data->pos[2] += 0.01;
+                // If using mode static1, spawn the tank slightly in the air so that it won't be moving around
+                if (mode == ModeStatic1)
+                    data->pos[2] += 0.01;
 
                 data->handled = true;
 
@@ -378,6 +429,9 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
 
     case bz_ePlayerSpawnEvent:
     {
+        if (spawnDelay == 0.0)
+            break;
+
         bz_PlayerSpawnEventData_V1* data = (bz_PlayerSpawnEventData_V1*)eventData;
 
         for (auto &stagedPlayer : stagedPlayers)
@@ -395,16 +449,51 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
         break;
     }
 
+    case bz_ePlayerDieEvent:
+    {
+        bz_PlayerDieEventData_V2* data = (bz_PlayerDieEventData_V2*)eventData;
+
+        for (auto &stagedPlayer: stagedPlayers)
+        {
+            if (stagedPlayer.playerID == data->playerID) {
+                // Disable spawning so we can add a delay between the explosion ending and the respawn
+                bz_setPlayerSpawnable(data->playerID, false);
+                stagedPlayer.lastDeath = data->eventTime;
+                break;
+            }
+        }
+    }
+
     case bz_ePlayerUpdateEvent:
     {
+        // We don't need to bother with this in normal mode
+        if (mode == ModeNormal)
+            break;
+
         bz_PlayerUpdateEventData_V1* data = (bz_PlayerUpdateEventData_V1*)eventData;
 
-        // We spawn tanks in the air, and have gravity set real low. Eventually a tank might land and start
-        // moving, so kill 'em if they do.
-        if (data->state.status == eAlive && (data->state.velocity[0] != 0.0f || data->state.velocity[1] != 0.0f))
-        {
-            bz_debugMessagef(0, "NOTE: Killing player '%s' because they moved", bz_getPlayerCallsign(data->playerID));
-            bz_killPlayer(data->playerID, false);
+        if (mode == ModeStatic1) {
+            // We spawn tanks in the air, and have gravity set real low. Eventually a tank might land and start
+            // moving, so kill 'em if they do.
+            if (data->state.status == eAlive && (data->state.velocity[0] != 0.0f || data->state.velocity[1] != 0.0f))
+            {
+                bz_debugMessagef(0, "NOTE: Killing player '%s' because they moved", bz_getPlayerCallsign(data->playerID));
+                bz_killPlayer(data->playerID, false);
+            }
+        }
+        else if (mode == ModeStatic2) {
+            // Find the staged player record
+            for (auto &stagedPlayer : stagedPlayers)
+            {
+                if (stagedPlayer.playerID == data->playerID) {
+                    // If they have moved a bit from their staged position, kill 'em
+                    if (fabs(stagedPlayer.pos[0] - data->state.pos[0]) > 0.1 || fabs(stagedPlayer.pos[1] - data->state.pos[1]) > 0.1) {
+                        bz_debugMessagef(0, "NOTE: Killing player '%s' because they moved", bz_getPlayerCallsign(data->playerID));
+                        bz_killPlayer(data->playerID, false);
+                    }
+                    break;
+                }
+            }
         }
         break;
     }
@@ -439,19 +528,34 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
             lastShotsFired = data->eventTime;
             for (auto stagedShot : stagedShots)
             {
-                // The laser and thief length is based on shot speed, so change the shot speed for this shot
-                if (stagedShot.flag == "L")
-                    bz_updateBZDBDouble("_shotSpeed", laserShotSpeed);
-                else if (stagedShot.flag == "TH")
-                    bz_updateBZDBDouble("_shotSpeed", thiefShotSpeed);
+                if (mode != ModeNormal) {
+                    // The laser and thief length is based on shot speed, so change the shot speed for this shot
+                    if (stagedShot.flag == "L")
+                        bz_updateBZDBDouble("_shotSpeed", laserShotSpeed);
+                    else if (stagedShot.flag == "TH")
+                        bz_updateBZDBDouble("_shotSpeed", thiefShotSpeed);
+                }
 
                 // FIRE!!!
                 bz_fireServerShot(stagedShot.flag.c_str(), stagedShot.pos, stagedShot.dir, stagedShot.team, stagedShot.targetPlayerID);
                 bz_debugMessagef(1, "Firing shot at %f %f %f", stagedShot.pos[0], stagedShot.pos[1], stagedShot.pos[2]);
 
-                // If we just shot a laser or thief, remember to set the shot speed again
-                if (stagedShot.flag == "L" || stagedShot.flag == "TH")
-                    bz_updateBZDBDouble("_shotSpeed", shotSpeed);
+                if (mode != ModeNormal) {
+                    // If we just shot a laser or thief, remember to set the shot speed again
+                    if (stagedShot.flag == "L" || stagedShot.flag == "TH")
+                        bz_updateBZDBDouble("_shotSpeed", shotSpeed);
+                }
+            }
+        }
+
+        if (spawnDelay > 0.0)
+        {
+            double explodeTime = bz_getBZDBDouble("_explodeTime");
+
+            for (auto &stagedPlayer : stagedPlayers)
+            {
+                if (data->eventTime > stagedPlayer.lastDeath + explodeTime + spawnDelay)
+                    bz_setPlayerSpawnable(stagedPlayer.playerID, true);
             }
         }
     }
