@@ -100,6 +100,7 @@ private:
     enum Modes {
         ModeStatic1,
         ModeStatic2,
+        ModeStatic3,
         ModeNormal
     };
 
@@ -167,16 +168,16 @@ void stagedSceneGenerator::Init ( const char* commandLine )
             bz_updateBZDBDouble("_flagAltitude", 0.0);
         }
 
-        // Mode Static2 - Very low tank speed and turning velocity. Normal gravity. Can't drive as observer and must
-        // use /roampos to move around. But, tanks explode in the normal arc.
-        else if (mode == ModeStatic2)
+        // Mode Static2 or Static3 - Very low tank speed and turning velocity. Normal gravity. Can't drive as observer
+        // and must use /roampos to move around. But, tanks explode in the normal arc.
+        else if (mode == ModeStatic2 || mode == ModeStatic3)
         {
             bz_updateBZDBDouble("_tankSpeed", 0.000001);
             bz_updateBZDBDouble("_tankAngVel", 0.000001);
         }
 
-        // If this isn't normal mode, set some other stuff.
-        if (mode != ModeNormal) {
+        // If this is static1 or static2, set some other stuff.
+        if (mode == ModeStatic1 || mode == ModeStatic2) {
             // Set some values that affect tanks and shots
             bz_updateBZDBDouble("_shotSpeed", shotSpeed);
             bz_updateBZDBDouble("_shotRange", 0.05);
@@ -251,10 +252,12 @@ bool stagedSceneGenerator::readConfig(const char* configFile)
                         mode = ModeStatic1;
                     else if (_mode == "static2")
                         mode = ModeStatic2;
+                    else if (_mode == "static3")
+                        mode = ModeStatic3;
                     else if (_mode == "normal")
                         mode = ModeNormal;
                     else {
-                        bz_debugMessage(0,"ERROR: Mode must be one of: static1, static2, or normal");
+                        bz_debugMessage(0,"ERROR: Mode must be one of: static1, static2, static3, or normal");
                         return false;
                     }
                 }
@@ -545,7 +548,7 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
             lastShotsFired = data->eventTime;
             for (auto stagedShot : stagedShots)
             {
-                if (mode != ModeNormal) {
+                if (mode == ModeStatic1 || mode == ModeStatic2) {
                     // The laser and thief length is based on shot speed, so change the shot speed for this shot
                     if (stagedShot.flag == "L")
                         bz_updateBZDBDouble("_shotSpeed", laserShotSpeed);
@@ -557,7 +560,7 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
                 bz_fireServerShot(stagedShot.flag.c_str(), stagedShot.pos, stagedShot.dir, stagedShot.team, stagedShot.targetPlayerID);
                 bz_debugMessagef(1, "Firing shot at %f %f %f", stagedShot.pos[0], stagedShot.pos[1], stagedShot.pos[2]);
 
-                if (mode != ModeNormal) {
+                if (mode == ModeStatic1 || mode == ModeStatic2) {
                     // If we just shot a laser or thief, remember to set the shot speed again
                     if (stagedShot.flag == "L" || stagedShot.flag == "TH")
                         bz_updateBZDBDouble("_shotSpeed", shotSpeed);

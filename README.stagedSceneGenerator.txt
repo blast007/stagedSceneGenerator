@@ -63,15 +63,17 @@ required and MAY being optional.
 You MAY have a Main section that MAY contain one or more options that affect
 the overall operation of the plugin or server.
 
-The Mode option can have one of three values: static1, static2, or normal. The
+The Mode option can be set to one of: static1, static2, static3 or normal. The
 static1 mode sets the gravity very low and spawns tanks slightly in the air so
 they won't move, but keeps normal tank speed. This allows observer roaming to
 still move freely, but things like tanks exploding won't look normal because of
 the low gravity. Mode static2 keeps the gravity normal, but sets the tank speed
 and tank angular velocity very low. This also affects the movement of observer
 roaming, so then it is necessary to use the /roampos command to move around.
-Finally, mode normal doesn't alter any setting and instead tanks will be able to
-drive around like normal. The default mode is static1.
+Mode static3 leaves the shot settings alone and only sets the tank speed and
+tank angular velocity very low. Finally, mode normal doesn't alter any setting
+and instead tanks will be able to drive around like normal. The default mode is
+static1.
 
 The ShotSpeed option allows changing the shot speed. For everything except
 normal mode, this defaults to 0.01 so that shots barely move. ShotDelay is the
