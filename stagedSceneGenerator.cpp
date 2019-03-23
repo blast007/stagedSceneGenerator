@@ -171,8 +171,8 @@ void stagedSceneGenerator::Init ( const char* commandLine )
         // use /roampos to move around. But, tanks explode in the normal arc.
         else if (mode == ModeStatic2)
         {
-            bz_updateBZDBDouble("_tankSpeed", -0.000001);
-            bz_updateBZDBDouble("_tankAngVel", -0.000001);
+            bz_updateBZDBDouble("_tankSpeed", 0.000001);
+            bz_updateBZDBDouble("_tankAngVel", 0.000001);
         }
 
         // If this isn't normal mode, set some other stuff.
