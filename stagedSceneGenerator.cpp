@@ -485,10 +485,14 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
 
         bz_PlayerUpdateEventData_V1* data = (bz_PlayerUpdateEventData_V1*)eventData;
 
+        // Only the living is allowed past this point.
+        if (data->state.status != eAlive)
+            break;
+
         if (mode == ModeStatic1) {
             // We spawn tanks in the air, and have gravity set real low. Eventually a tank might land and start
             // moving, so kill 'em if they do.
-            if (data->state.status == eAlive && (data->state.velocity[0] != 0.0f || data->state.velocity[1] != 0.0f))
+            if (data->state.velocity[0] != 0.0f || data->state.velocity[1] != 0.0f)
             {
                 bz_debugMessagef(0, "NOTE: Killing player '%s' because they moved", bz_getPlayerCallsign(data->playerID));
                 bz_killPlayer(data->playerID, false);
