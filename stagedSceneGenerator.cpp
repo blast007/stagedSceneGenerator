@@ -38,7 +38,7 @@ either expressed or implied, of the FreeBSD Project.
 #include <math.h>
 #include <vector>
 
-class stagedSceneGenerator : public bz_Plugin
+class stagedSceneGenerator : public bz_Plugin, public bz_CustomSlashCommandHandler
 {
 public:
     virtual const char* Name ()
@@ -46,8 +46,9 @@ public:
         return "Staged Scene Generator";
     }
     virtual void Init ( const char* config );
-
+    virtual void Cleanup();
     virtual void Event ( bz_EventData * eventData );
+    virtual bool SlashCommand ( int playerID, bz_ApiString, bz_ApiString, bz_APIStringList*);
 
 private:
     bool readConfig(const char* configFile);
@@ -189,7 +190,19 @@ void stagedSceneGenerator::Init ( const char* commandLine )
         // Gotta go fast! (only useful when there are no players and only shots)
         if (stagedPlayers.size() == 0)
             MaxWaitTime = 0.05f;
+
+        // Register a custom command
+        bz_registerCustomSlashCommand("scene", this);
     }
+}
+
+void stagedSceneGenerator::Cleanup()
+{
+    // Remove custom command
+    bz_removeCustomSlashCommand("scene");
+
+    // Remove event handlers
+    Flush();
 }
 
 bool stagedSceneGenerator::readConfig(const char* configFile)
@@ -563,6 +576,24 @@ void stagedSceneGenerator::Event(bz_EventData *eventData)
     default:
         break;
     }
+}
+
+bool stagedSceneGenerator::SlashCommand ( int playerID, bz_ApiString /*cmd*/, bz_ApiString, bz_APIStringList* cmdParams )
+{
+    std::string subcommand = makelower(cmdParams->get(0).c_str());
+
+    if (subcommand == "reset") {
+        for (auto &stagedPlayer : stagedPlayers)
+        {
+            if (stagedPlayer.playerID > -1)
+                bz_killPlayer(stagedPlayer.playerID, false);
+        }
+    }
+    else {
+        bz_sendTextMessage(BZ_SERVER, playerID, "Usage: /scene reset");
+    }
+
+    return true;
 }
 
 // Local Variables: ***
